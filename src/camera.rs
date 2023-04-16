@@ -18,11 +18,13 @@ pub struct Camera {
   pub u: Vec3,
   pub v: Vec3,
   pub w: Vec3,
-  pub lens_radius: f32
+  pub lens_radius: f32,
+  pub time_start: f32,
+  pub time_end: f32,
 }
 
 impl Camera {
-  pub fn new(look_from: Vec3, look_at: Vec3, v_up: Vec3, v_fov: f32, aspect_ratio: f32, aperture: f32, focus_dist: f32) -> Self {
+  pub fn new(look_from: Vec3, look_at: Vec3, v_up: Vec3, v_fov: f32, aspect_ratio: f32, aperture: f32, focus_dist: f32, time_start: f32, time_end: f32) -> Self {
     let theta = std::f32::consts::PI / 180.0 * v_fov;
     let h = 2.0 * (theta / 2.0).tan();
     let viewport_height = h;
@@ -38,6 +40,7 @@ impl Camera {
     let llc = look_from - h / 2.0 - v / 2.0 - focus_dist * w;  
     let lens_radius = aperture / 2.0;
 
+
     Self {
       origin: look_from,
       lower_left_corner: llc,
@@ -46,15 +49,18 @@ impl Camera {
       u,
       v,
       w,
-      lens_radius
+      lens_radius,
+      time_start,
+      time_end
     }
   }
 
   pub fn get_ray(&self, s: f32, t: f32) -> Ray {
+    let mut rng = rand::thread_rng();
     let rd: Vec3 = self.lens_radius * random_in_unit_disk();
     let offset: Vec3 = self.u * rd[0] + self.v * rd[1];
 
-    Ray::new(self.origin + offset, self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset)
+    Ray::new(self.origin + offset, self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,Some(rng.gen_range(self.time_start..=self.time_end)))
   }
 
   pub fn render(&self, image_height: u32, image_width: u32, max_depth: u8, samples_per_pixel: u16, world: &impl Hittable) -> RgbImage {

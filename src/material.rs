@@ -20,13 +20,13 @@ impl Material {
           scatter_direction = rec.normal;
         }
 
-        let scattered = Ray::new(rec.p, scatter_direction);
+        let scattered = Ray::new(rec.p, scatter_direction, Some(ray_in.time()));
         Some((*albedo, scattered))
       },
       Self::Metal(albedo, fuzziness) => {
         let fuzziness = fuzziness.clamp(0.0, 1.0);
         let reflected: Vec3 = glm::reflect_vec(&ray_in.direction(), &rec.normal).normalize();
-        let scattered = Ray::new(rec.p, reflected + fuzziness * random_in_unit_sphere());
+        let scattered = Ray::new(rec.p, reflected + fuzziness * random_in_unit_sphere(), Some(ray_in.time()));
         if scattered.direction().dot(&rec.normal) > 0.0 {
           Some((*albedo, scattered))
         } else {
@@ -53,7 +53,7 @@ impl Material {
         } else {
           glm::refract_vec(&unit_direction, &rec.normal, refraction_ratio)
         };
-        let scattered = Ray::new(rec.p, direction);
+        let scattered = Ray::new(rec.p, direction, Some(ray_in.time()));
         Some((attenuation, scattered))
       }
     }

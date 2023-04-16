@@ -1,5 +1,6 @@
 use glm::Vec3;
 use rand::{Rng};
+use sphere::MovingSphere;
 use crate::{hittable::HittableList, sphere::Sphere, camera::Camera, material::Material};
 extern crate nalgebra_glm as glm;
 
@@ -71,8 +72,9 @@ fn random_scene() -> HittableList {
             if (center - Vec3::new(4.0, 0.2, 0.0)).magnitude() > 0.9 {
                 if choose_mat < 0.8 {
                     let albedo: Vec3 = Vec3::new(rng.gen::<f32>(), rng.gen::<f32>(), rng.gen::<f32>());
+                    let center_end = center + Vec3::new(0.0, rng.gen_range(0.0..=0.5),0.0);
                     let material = Material::Lambertian(albedo);
-                    world.add(Sphere::new(center, 0.2, material))
+                    world.add(MovingSphere::new(center, center_end, 0.0, 1.0, 0.2, material))
                 } else if choose_mat < 0.95 {
                     let albedo: Vec3 = Vec3::new(rng.gen_range(0.5..=1.0), rng.gen_range(0.5..=1.0), rng.gen_range(0.5..=1.0));
                     let fuzz: f32 = rng.gen_range(0.0..1.0);
@@ -103,9 +105,9 @@ fn main() {
     const ASPECT_RATIO: f32 = 16.0 / 9.0;
     const FOCUS_DIST: f32 = 10.0;
     const APERTURE: f32 = 0.1;
-    const IMAGE_WIDTH: i16 = 1920;
+    const IMAGE_WIDTH: i16 = 400;
     const IMAGE_HEIGHT: i16 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i16;
-    const SAMPLES_PER_PIXEL: u16 = 500;
+    const SAMPLES_PER_PIXEL: u16 = 100;
     const MAX_DEPTH: u8 = 50;
 
     // WORLD
@@ -122,11 +124,13 @@ fn main() {
         ASPECT_RATIO,
         APERTURE,
         FOCUS_DIST,
+        0.0,
+        1.0
     );
 
     // RENDER
 
     let image = camera.render(IMAGE_HEIGHT as u32, IMAGE_WIDTH as u32, MAX_DEPTH, SAMPLES_PER_PIXEL, &world);
 
-    image.save("output.png").unwrap();
+    image.save("test.png").unwrap();
 }
