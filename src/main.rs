@@ -1,10 +1,6 @@
-use std::sync::{Arc, Mutex};
+use rand::{Rng};
 
-use hittable::{Hittable};
-use image::{ImageBuffer, Rgb, RgbImage};
-use rand::{random, Rng};
-use ray::Ray;
-use rayon::prelude::*;
+
 use vec3::Vec3;
 
 use crate::{vec3::{Color3, Point3}, hittable::HittableList, sphere::Sphere, camera::Camera, material::Material};
@@ -15,23 +11,6 @@ mod hittable;
 mod sphere;
 mod camera;
 mod material;
-
-fn ray_color(ray: &Ray, world: &impl Hittable, depth: u8) -> Color3 {
-    if depth == 0 {
-        return Color3::new(0.0, 0.0, 0.0)
-    }
-
-    if let Some(hit_record) = world.hit(ray, 0.001, f64::INFINITY) {
-        if let Some((attenuation, scattered)) = hit_record.material.scatter(ray, &hit_record) {
-            return attenuation * ray_color(&scattered, world, depth - 1)
-        }
-        return Color3::new(0.0, 0.0, 0.0)
-    }
-
-    let unit_direction: Vec3 = Vec3::unit_vector(ray.direction());
-    let t = 0.5 * (unit_direction.y() + 1.0);
-    (1.0 - t) * Color3::new(1.0, 1.0, 1.0) + t * Color3::new(0.5, 0.7, 1.0)
-}
 
 fn random_in_unit_sphere() -> Vec3 {
     let mut rng = rand::thread_rng();
@@ -104,35 +83,19 @@ fn random_scene() -> HittableList {
 fn main() {
     // IMAGE
 
-    const ASPECT_RATIO: f64 = 3.0 / 2.0;
+    const ASPECT_RATIO: f64 = 16.0 / 9.0;
     const FOCUS_DIST: f64 = 10.0;
     const APERTURE: f64 = 0.1;
-    const IMAGE_WIDTH: i16 = 1200;
+    const IMAGE_WIDTH: i16 = 1920;
     const IMAGE_HEIGHT: i16 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as i16;
     const SAMPLES_PER_PIXEL: u16 = 500;
     const MAX_DEPTH: u8 = 50;
 
     // WORLD
-    // let mut world: HittableList = HittableList::default();
-    // let material_ground = Material::Lambertian(Color3::new(0.8, 0.8, 0.0));
-    // let material_center = Material::Lambertian(Color3::new(0.1, 0.2, 0.5));
-    // let material_left = Material::Dielectric(1.5);
-    // let material_left_inner = Material::Dielectric(1.5);
-    // let material_right = Material::Metal(Color3::new(0.8, 0.6, 0.2), 0.0);
-
-    // let sphere_ground = Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0, material_ground);
-    // let sphere_center = Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5, material_center);
-    // let sphere_left = Sphere::new(Point3::new(-1.0, 0.0, -1.0), 0.5, material_left);
-    // let sphere_left_inner = Sphere::new(Point3::new(-1.0, 0.0, -1.0), -0.45, material_left_inner);
-    // let sphere_right = Sphere::new(Point3::new(1.0, 0.0, -1.0), 0.5, material_right);
-
-    // world.add(sphere_ground);
-    // world.add(sphere_center);
-    // world.add(sphere_left);
-    // world.add(sphere_left_inner);
-    // world.add(sphere_right);
 
     let world = random_scene();
+
+    // CAMERA
 
     let camera = Camera::new(
         Point3::new(13.0, 2.0, 3.0),
@@ -146,32 +109,7 @@ fn main() {
 
     // RENDER
 
-    let img_buf = Mutex::new(RgbImage::new(IMAGE_WIDTH as u32, IMAGE_HEIGHT as u32));
-    
-    (0..IMAGE_HEIGHT)
-    .into_par_iter()
-    .rev()
-    .for_each(|j| {
-        for i in 0..IMAGE_WIDTH {
-            let mut pixel_color = Color3::new(0.0, 0.0, 0.0);
-            let mut samples = 0;
-            while samples < SAMPLES_PER_PIXEL {
-                let u: f64 = (i as f64 + random::<f64>()) / (IMAGE_WIDTH - 1) as f64;
-                let v: f64 = (j as f64 + random::<f64>()) / (IMAGE_HEIGHT - 1) as f64;
-                let ray = camera.get_ray(u, v);
-                pixel_color += ray_color(&ray, &world, MAX_DEPTH);
-                samples += 1;
-            }
-            let color = pixel_color.write_color(SAMPLES_PER_PIXEL);
-            let rgb = Rgb([
-                (color.x() * 255.99) as u8,
-                (color.y() * 255.99) as u8,
-                (color.z() * 255.99) as u8,
-            ]);
-            let mut img_buf = img_buf.lock().unwrap();
-            img_buf.put_pixel(i as u32, j as u32, rgb);
-        }
-    });
+    let image = camera.render(IMAGE_HEIGHT as u32, IMAGE_WIDTH as u32, MAX_DEPTH, SAMPLES_PER_PIXEL, &world);
 
-    img_buf.lock().unwrap().save("output.png").unwrap();
+    image.save("output.png").unwrap();
 }

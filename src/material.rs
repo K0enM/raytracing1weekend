@@ -1,4 +1,4 @@
-use rand::{random, Rng};
+use rand::{Rng};
 
 use crate::{ray::Ray, hittable::HitRecord, vec3::{Color3, Vec3}, random_unit_vector, random_in_unit_sphere};
 
