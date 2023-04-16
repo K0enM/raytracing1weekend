@@ -1,16 +1,17 @@
-use crate::{vec3::{Point3, Vec3}, ray::Ray};
+use crate::{vec3::{Point3, Vec3, Color3}, ray::Ray, material::{Material}};
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct HitRecord {
   pub p: Point3,
   pub normal: Vec3,
   pub t: f64,
-  pub front_face: bool
+  pub front_face: bool,
+  pub material: Material
 }
 
 impl HitRecord {
-  pub fn new(p: Point3, normal: Vec3, t: f64, front_face: bool) -> Self {
-    Self { p, normal, t, front_face }
+  pub fn new(p: Point3, normal: Vec3, t: f64, front_face: bool, material: Material) -> Self {
+    Self { p, normal, t, front_face, material}
   }
 
   pub fn set_face_normal(&mut self, ray: &Ray, outward_normal: &Vec3) {
@@ -18,13 +19,13 @@ impl HitRecord {
     self.normal = if self.front_face {
       *outward_normal
     } else {
-      -*outward_normal
+      (-1.0) * *outward_normal
     };
   }
 }
 
-pub trait Hittable {
-  fn hit(&self, ray: &Ray , t_min: f64, t_max: f64, rec: &mut HitRecord) -> bool;
+pub trait Hittable: Sync + Send {
+  fn hit(&self, ray: &Ray , t_min: f64, t_max: f64) -> Option<HitRecord>;
 }
 
 #[derive(Default)]
@@ -47,22 +48,24 @@ impl HittableList {
 }
 
 impl Hittable for HittableList {
-  fn hit(&self, ray: &Ray , t_min: f64, t_max: f64, mut rec: &mut HitRecord) -> bool {
-      let mut temp_rec: HitRecord = HitRecord::default();
+  fn hit(&self, ray: &Ray , t_min: f64, t_max: f64) -> Option<HitRecord> {
+      let mat = Material::Lambertian(Color3::new(0.0, 0.0, 0.0));
+      let mut rec = HitRecord::new(Vec3::default(), Vec3::default(), 0.0, false, mat);
       let mut hit_anything: bool = false;
       let mut closest_so_far: f64 = t_max;
 
       for object in self.objects.iter() {
-        if object.hit(ray, t_min, closest_so_far, &mut temp_rec) {
+        if let Some(temp_rec) = object.hit(ray, t_min, closest_so_far) {
           hit_anything = true;
           closest_so_far = temp_rec.t;
-          rec.p = temp_rec.p;
-          rec.t = temp_rec.t;
-          rec.normal = temp_rec.normal;
-          rec.front_face = temp_rec.front_face;
+          rec = temp_rec;
         }
       }
 
-      hit_anything
+      if hit_anything {
+        Some(rec)
+      } else {
+        None
+      }
   }
 }

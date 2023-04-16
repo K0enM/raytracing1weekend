@@ -1,5 +1,5 @@
+use rand::Rng;
 use std::ops;
-use std::fmt;
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Vec3 {
@@ -157,7 +157,7 @@ impl Vec3 {
   pub fn cross(&self, rhs: &Vec3) -> Vec3 {
     Self {
       e: [
-        self.x() * rhs.z() - self.z() * rhs.y(),
+        self.y() * rhs.z() - self.z() * rhs.y(),
         self.z() * rhs.x() - self.x() * rhs.z(),
         self.x() * rhs.y() - self.y() * rhs.x()
       ]
@@ -168,7 +168,7 @@ impl Vec3 {
     v / v.length()
   }
 
-  pub fn write_color(&self, samples_per_pixel: i8) -> String {
+  pub fn write_color(&self, samples_per_pixel: u16) -> Vec3 {
     let scale: f64 = 1.0 / samples_per_pixel as f64;
     
     let r = (self.x() * scale).sqrt();
@@ -179,6 +179,42 @@ impl Vec3 {
     let ig = 255.0 * g.clamp(0.0, 0.999);
     let ib = 255.0 * b.clamp(0.0, 0.999);
 
-    format!("{} {} {}", ir as u8, ig as u8, ib as u8)
+    Self {
+      e: [ir, ig, ib]
+    }
+  }
+
+  pub fn near_zero(&self) -> bool {
+    let s: f64 = 1.0e-8;
+    self.x().abs() < s && self.y().abs() < s && self.z().abs() < s
+  }
+
+  pub fn reflect(&self, n: Vec3) -> Vec3{
+    *self - 2.0 * self.dot(&n) * n
+  }
+
+  pub fn refract(self, n: Vec3, etai_over_etat: f64) -> Vec3 {
+    let cos_theta = (-1.0 * self).dot(&n).min(1.0);
+    let r_out_perp = etai_over_etat * (self + cos_theta * n);
+    let r_out_parallel = -(1.0 - r_out_perp.length_squared()).abs().sqrt() * n;
+    r_out_perp + r_out_parallel
+  }
+
+  pub fn random() -> Vec3 {
+    let mut rng = rand::thread_rng();
+
+    Self { e: [rng.gen::<f64>(), rng.gen::<f64>(), rng.gen::<f64>()] }
+  }
+
+  pub fn random_range(min: f64, max: f64) -> Vec3 {
+    let mut rng = rand::thread_rng();
+
+    Self {
+      e: [
+        rng.gen_range(min..=max),
+        rng.gen_range(min..=max),
+        rng.gen_range(min..=max),
+      ]
+    }
   }
 }

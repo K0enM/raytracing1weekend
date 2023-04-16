@@ -1,33 +1,49 @@
-use crate::{vec3::{Point3, Vec3}, ray::Ray};
+use crate::{vec3::{Point3, Vec3}, ray::Ray, random_in_unit_disk};
 
 pub struct Camera {
   pub origin: Point3,
   pub lower_left_corner: Point3,
   pub horizontal: Vec3,
   pub vertical: Vec3,
+  pub u: Vec3,
+  pub v: Vec3,
+  pub w: Vec3,
+  pub lens_radius: f64
 }
 
 impl Camera {
-  pub fn new() -> Self {
-    const ASPECT_RATIO: f64 = 16.0 / 9.0;
-    const VIEWPORT_HEIGHT: f64 = 2.0;
-    const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
-    const FOCAL_LENGTH: f64 = 1.0;
+  pub fn new(look_from: Point3, look_at: Point3, v_up: Vec3, v_fov: f64, aspect_ratio: f64, aperture: f64, focus_dist: f64) -> Self {
+    let theta = std::f64::consts::PI / 180.0 * v_fov;
+    let h = 2.0 * (theta / 2.0).tan();
+    let viewport_height = h;
+    let viewport_width = aspect_ratio * viewport_height;
 
-    let origin = Point3::new(0.0, 0.0, 0.0);
-    let horizontal = Vec3::new(VIEWPORT_WIDTH, 0.0, 0.0);
-    let vertical = Vec3::new(0.0, VIEWPORT_HEIGHT, 0.0);
-    let lower_left_corner = origin - horizontal / 2.0 - vertical / 2.0 - Vec3::new(0.0, 0.0, FOCAL_LENGTH);
+    let w = Vec3::unit_vector(look_from - look_at);
+    let u = Vec3::unit_vector(v_up.cross(&w));
+    let v = w.cross(&u);
+
+    let h = focus_dist * viewport_width * u;
+    let v = focus_dist * viewport_height * v;
+
+    let llc = look_from - h / 2.0 - v / 2.0 - focus_dist * w;  
+    let lens_radius = aperture / 2.0;
 
     Self {
-      origin,
-      lower_left_corner,
-      horizontal,
-      vertical
+      origin: look_from,
+      lower_left_corner: llc,
+      horizontal: h,
+      vertical: v,
+      u,
+      v,
+      w,
+      lens_radius
     }
   }
 
-  pub fn get_ray(&self, u: f64, v: f64) -> Ray {
-    Ray::new(self.origin, self.lower_left_corner + u * self.horizontal + v * self.vertical - self.origin)
+  pub fn get_ray(&self, s: f64, t: f64) -> Ray {
+    let rd = self.lens_radius * random_in_unit_disk();
+    let offset = self.u * rd.x() + self.v * rd.y();
+
+    Ray::new(self.origin + offset, self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset)
   }
 }
