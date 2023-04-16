@@ -3,31 +3,33 @@ use std::{sync::Mutex, fmt::Write};
 use image::{RgbImage, Rgb};
 use indicatif::{ProgressBar, ProgressStyle, ProgressState};
 use itertools::Itertools;
+use nalgebra_glm::Vec3;
+
 use rayon::iter::{ ParallelBridge, ParallelIterator};
 use rand::{Rng};
 
-use crate::{vec3::{Point3, Vec3, Color3}, ray::Ray, random_in_unit_disk, hittable::Hittable};
+use crate::{ray::Ray, random_in_unit_disk, hittable::Hittable, ColorExtension};
 
 pub struct Camera {
-  pub origin: Point3,
-  pub lower_left_corner: Point3,
+  pub origin: Vec3,
+  pub lower_left_corner: Vec3,
   pub horizontal: Vec3,
   pub vertical: Vec3,
   pub u: Vec3,
   pub v: Vec3,
   pub w: Vec3,
-  pub lens_radius: f64
+  pub lens_radius: f32
 }
 
 impl Camera {
-  pub fn new(look_from: Point3, look_at: Point3, v_up: Vec3, v_fov: f64, aspect_ratio: f64, aperture: f64, focus_dist: f64) -> Self {
-    let theta = std::f64::consts::PI / 180.0 * v_fov;
+  pub fn new(look_from: Vec3, look_at: Vec3, v_up: Vec3, v_fov: f32, aspect_ratio: f32, aperture: f32, focus_dist: f32) -> Self {
+    let theta = std::f32::consts::PI / 180.0 * v_fov;
     let h = 2.0 * (theta / 2.0).tan();
     let viewport_height = h;
     let viewport_width = aspect_ratio * viewport_height;
 
-    let w = Vec3::unit_vector(look_from - look_at);
-    let u = Vec3::unit_vector(v_up.cross(&w));
+    let w = (look_from - look_at).normalize();
+    let u = v_up.cross(&w).normalize();
     let v = w.cross(&u);
 
     let h = focus_dist * viewport_width * u;
@@ -48,9 +50,9 @@ impl Camera {
     }
   }
 
-  pub fn get_ray(&self, s: f64, t: f64) -> Ray {
-    let rd = self.lens_radius * random_in_unit_disk();
-    let offset = self.u * rd.x() + self.v * rd.y();
+  pub fn get_ray(&self, s: f32, t: f32) -> Ray {
+    let rd: Vec3 = self.lens_radius * random_in_unit_disk();
+    let offset: Vec3 = self.u * rd[0] + self.v * rd[1];
 
     Ray::new(self.origin + offset, self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset)
   }
@@ -61,7 +63,7 @@ impl Camera {
     progress_bar
       .set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {it}/{total_iterations} ({eta})")
       .unwrap()
-      .with_key("eta", |state: &ProgressState, w: &mut dyn Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap())
+      .with_key("eta", |state: &ProgressState, w: &mut dyn Write| write!(w, "{:.1}s", state.eta().as_secs_f32()).unwrap())
       .progress_chars("#>-")
     );
     
@@ -70,18 +72,18 @@ impl Camera {
       .par_bridge()
       .for_each(|(x, y)| {
         let mut rng = rand::thread_rng();
-        let mut pixel_color = Color3::new(0.0, 0.0, 0.0);
+        let mut pixel_color: Vec3 = Vec3::new(0.0, 0.0, 0.0);
         for _s in 0..samples_per_pixel {
-          let u: f64 = (x as f64 + rng.gen::<f64>()) / (image_width - 1) as f64;
-          let v: f64 = (y as f64 + rng.gen::<f64>()) / (image_height - 1) as f64;
+          let u: f32 = (x as f32 + rng.gen::<f32>()) / (image_width - 1) as f32;
+          let v: f32 = (y as f32 + rng.gen::<f32>()) / (image_height - 1) as f32;
           let ray = self.get_ray(u, v);
           pixel_color += Camera::ray_color(&ray, world, max_depth);
         }
         let color = pixel_color.write_color(samples_per_pixel);
         let rgb = Rgb([
-          (color.x()) as u8,
-          (color.y()) as u8,
-          (color.z()) as u8,
+          (color[0]) as u8,
+          (color[1]) as u8,
+          (color[2]) as u8,
       ]);
       let mut img_buf = img_buf.lock().unwrap();
       img_buf.put_pixel(x, image_height - y - 1, rgb);
@@ -91,20 +93,20 @@ impl Camera {
       img_buf.into_inner().unwrap()
   }
 
-  pub fn ray_color(ray: &Ray, world: &impl Hittable, depth: u8) -> Color3 {
+  pub fn ray_color(ray: &Ray, world: &impl Hittable, depth: u8) -> Vec3 {
     if depth == 0 {
-      return Color3::new(0.0, 0.0, 0.0)
+      return Vec3::new(0.0, 0.0, 0.0)
   }
 
-  if let Some(hit_record) = world.hit(ray, 0.001, f64::INFINITY) {
+  if let Some(hit_record) = world.hit(ray, 0.001, f32::INFINITY) {
       if let Some((attenuation, scattered)) = hit_record.material.scatter(ray, &hit_record) {
-          return attenuation * Camera::ray_color(&scattered, world, depth - 1)
+          return attenuation.component_mul(&Camera::ray_color(&scattered, world, depth - 1))
       }
-      return Color3::new(0.0, 0.0, 0.0)
+      return Vec3::new(0.0, 0.0, 0.0)
   }
 
-  let unit_direction: Vec3 = Vec3::unit_vector(ray.direction());
-  let t = 0.5 * (unit_direction.y() + 1.0);
-  (1.0 - t) * Color3::new(1.0, 1.0, 1.0) + t * Color3::new(0.5, 0.7, 1.0)
+  let unit_direction: Vec3 = ray.direction().normalize();
+  let t = 0.5 * (unit_direction[1] + 1.0);
+  (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
   }
 }

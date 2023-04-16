@@ -1,16 +1,18 @@
-use crate::{vec3::{Point3, Vec3, Color3}, ray::Ray, material::{Material}};
+use nalgebra_glm::Vec3;
+
+use crate::{ray::Ray, material::{Material}};
 
 #[derive(Clone, Copy)]
 pub struct HitRecord {
-  pub p: Point3,
+  pub p: Vec3,
   pub normal: Vec3,
-  pub t: f64,
+  pub t: f32,
   pub front_face: bool,
   pub material: Material
 }
 
 impl HitRecord {
-  pub fn new(p: Point3, normal: Vec3, t: f64, front_face: bool, material: Material) -> Self {
+  pub fn new(p: Vec3, normal: Vec3, t: f32, front_face: bool, material: Material) -> Self {
     Self { p, normal, t, front_face, material}
   }
 
@@ -25,7 +27,7 @@ impl HitRecord {
 }
 
 pub trait Hittable: Sync + Send {
-  fn hit(&self, ray: &Ray , t_min: f64, t_max: f64) -> Option<HitRecord>;
+  fn hit(&self, ray: &Ray , t_min: f32, t_max: f32) -> Option<HitRecord>;
 }
 
 #[derive(Default)]
@@ -40,11 +42,11 @@ impl HittableList {
 }
 
 impl Hittable for HittableList {
-  fn hit(&self, ray: &Ray , t_min: f64, t_max: f64) -> Option<HitRecord> {
-      let mat = Material::Lambertian(Color3::new(0.0, 0.0, 0.0));
+  fn hit(&self, ray: &Ray , t_min: f32, t_max: f32) -> Option<HitRecord> {
+      let mat = Material::Lambertian(Vec3::new(0.0, 0.0, 0.0));
       let mut rec = HitRecord::new(Vec3::default(), Vec3::default(), 0.0, false, mat);
       let mut hit_anything: bool = false;
-      let mut closest_so_far: f64 = t_max;
+      let mut closest_so_far: f32 = t_max;
 
       for object in self.objects.iter() {
         if let Some(temp_rec) = object.hit(ray, t_min, closest_so_far) {
